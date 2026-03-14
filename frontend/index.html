@@ -1,12 +1,52 @@
 <!doctype html>
-<html lang="en">
+<html lang="ja">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>todo-app</title>
+    <title>React Best Practices - Todo App</title>
+
+    <!--
+      [rendering-resource-hints] preconnect でAPIサーバーへの接続を事前確立
+      DNS解決・TCP接続・TLS交渉を事前に完了し、最初のAPIリクエストを高速化する
+      BAD: preconnect を設定しないと、最初のAPIリクエスト時に全てのネゴシエーションが発生する
+    -->
+    <link rel="preconnect" href="http://localhost:8080" />
+
+    <!--
+      [rendering-resource-hints] dns-prefetch は preconnect 非対応ブラウザへのフォールバック
+    -->
+    <link rel="dns-prefetch" href="http://localhost:8080" />
   </head>
   <body>
+    <!--
+      [rendering-hydration-no-flicker] テーマ初期化のちらつき防止（SPA版）
+      Reactがマウントする前にテーマを適用し、白→暗のフラッシュを防ぐ
+      [rendering-hydration-suppress-warning] インラインスクリプトで即座に実行
+
+      BAD: React コンポーネント内でテーマを適用すると、
+           初期レンダリング後にテーマが切り替わり、画面がちらつく
+    -->
+    <script>
+      (function() {
+        try {
+          var raw = localStorage.getItem('app-settings-v1');
+          if (raw) {
+            var parsed = JSON.parse(raw);
+            if (parsed.version === 1 && parsed.data && parsed.data.theme) {
+              var theme = parsed.data.theme;
+              if (theme === 'dark') {
+                document.documentElement.classList.add('dark');
+              } else if (theme === 'system') {
+                if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                  document.documentElement.classList.add('dark');
+                }
+              }
+            }
+          }
+        } catch(e) {}
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

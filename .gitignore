@@ -1,2 +1,5 @@
 setting.local.json
 backend/.env
+.agents/
+.claude/skills/
+skills-lock.json

@@ -5,4 +5,5 @@ export interface Todo {
   text: string
   completed: boolean
   createdAt: number
+  categoryId: string
 }

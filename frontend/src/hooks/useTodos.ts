@@ -44,7 +44,7 @@ export function useTodos() {
     if (!trimmed) return
     setTodos((prev) => [
       ...prev,
-      { id: crypto.randomUUID(), text: trimmed, completed: false, createdAt: Date.now() },
+      { id: crypto.randomUUID(), text: trimmed, completed: false, createdAt: Date.now(), categoryId: "" },
     ])
   }, [])
 

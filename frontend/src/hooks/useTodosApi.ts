@@ -4,6 +4,17 @@ import type { Todo } from "@/types/todo"
 
 const QUERY_KEY = ["todos"] as const
 
+/**
+ * [client-swr-dedup] React Query の重複排除パターン
+ * 同じクエリキーを使う複数のコンポーネントが同時にマウントされても、
+ * React Query がリクエストを重複排除し、1回のfetchで済ませる
+ * BAD: 各コンポーネントで個別に fetch を呼ぶと、同じデータを複数回取得してしまう
+ *
+ * [server-cache-react] React Query のキャッシュ戦略
+ * staleTime: データが "新鮮" とみなされる時間（この間は再フェッチしない）
+ * gcTime: ガベージコレクションまでの時間（アンマウント後もキャッシュを保持）
+ * refetchOnWindowFocus: ウィンドウフォーカス時に自動再フェッチ
+ */
 export function useTodosApi() {
   const queryClient = useQueryClient()
 
@@ -11,6 +22,10 @@ export function useTodosApi() {
     queryKey: QUERY_KEY,
     queryFn: todoApi.list,
     staleTime: 10_000,
+    // [server-cache-react] キャッシュをアンマウント後も5分間保持
+    gcTime: 5 * 60 * 1000,
+    // [server-cache-react] ウィンドウフォーカス時に自動再フェッチ
+    refetchOnWindowFocus: true,
   })
 
   const addTodo = useMutation({
@@ -23,6 +38,7 @@ export function useTodosApi() {
         text,
         completed: false,
         createdAt: Date.now(),
+        categoryId: "",
       }
       queryClient.setQueryData<Todo[]>(QUERY_KEY, (old = []) => [optimistic, ...old])
       return { previous }
@@ -30,7 +46,15 @@ export function useTodosApi() {
     onError: (_err, _text, ctx) => {
       queryClient.setQueryData(QUERY_KEY, ctx?.previous)
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: QUERY_KEY }),
+    /**
+     * [async-api-routes] onSettled で関連キャッシュも同時にinvalidate
+     * Todo の変更は stats と activities にも影響するため、一括でinvalidateする
+     */
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY })
+      queryClient.invalidateQueries({ queryKey: ["stats"] })
+      queryClient.invalidateQueries({ queryKey: ["activities"] })
+    },
   })
 
   const toggleTodo = useMutation({
@@ -49,7 +73,11 @@ export function useTodosApi() {
     onError: (_err, _id, ctx) => {
       queryClient.setQueryData(QUERY_KEY, ctx?.previous)
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: QUERY_KEY }),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY })
+      queryClient.invalidateQueries({ queryKey: ["stats"] })
+      queryClient.invalidateQueries({ queryKey: ["activities"] })
+    },
   })
 
   const deleteTodo = useMutation({
@@ -63,7 +91,11 @@ export function useTodosApi() {
     onError: (_err, _id, ctx) => {
       queryClient.setQueryData(QUERY_KEY, ctx?.previous)
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: QUERY_KEY }),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY })
+      queryClient.invalidateQueries({ queryKey: ["stats"] })
+      queryClient.invalidateQueries({ queryKey: ["activities"] })
+    },
   })
 
   return {
