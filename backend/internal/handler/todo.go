@@ -53,6 +53,17 @@ func (h *TodoHandler) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, todo)
+
+	// [server-after-nonblocking] レスポンス送信後に非同期でアクティビティを記録
+	go func() {
+		_ = h.store.CreateActivity(r.Context(), model.Activity{
+			ID:        newUUID(),
+			Action:    "created",
+			TodoID:    todo.ID,
+			TodoText:  todo.Text,
+			CreatedAt: time.Now().UnixMilli(),
+		})
+	}()
 }
 
 func (h *TodoHandler) update(w http.ResponseWriter, r *http.Request) {
@@ -74,6 +85,23 @@ func (h *TodoHandler) update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, todo)
+
+	// [server-after-nonblocking] 完了状態変更時にアクティビティを記録
+	if req.Completed != nil {
+		go func() {
+			action := "uncompleted"
+			if *req.Completed {
+				action = "completed"
+			}
+			_ = h.store.CreateActivity(r.Context(), model.Activity{
+				ID:        newUUID(),
+				Action:    action,
+				TodoID:    todo.ID,
+				TodoText:  todo.Text,
+				CreatedAt: time.Now().UnixMilli(),
+			})
+		}()
+	}
 }
 
 func (h *TodoHandler) delete(w http.ResponseWriter, r *http.Request) {
